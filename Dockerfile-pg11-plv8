@@ -1,23 +1,29 @@
 FROM postgres:11.2
 
-MAINTAINER aruis (lovearuis@gmail.com)
+# inspired by https://github.com/aruis/postgres-dockerfile/
+
+MAINTAINER asah (adam.sah@gmail.com)
 
 ENV PLV8_VERSION=2.3.11
 
-RUN apt-get -y update 
-RUN apt-get -y install postgresql-server-dev-11
-RUN apt-get -y install gcc make g++
-RUN apt-get -y install pkg-config
-RUN apt-get -y install libc++-dev 
-    
-RUN apt-get -y install curl git \ 
-    && mkdir -p /plv8build \
-    && cd plv8build \
-    && curl -o plv8.tar.gz -L https://github.com/plv8/plv8/archive/v${PLV8_VERSION}.tar.gz \
-    && tar -xvzf plv8.tar.gz \
-    && cd plv8-${PLV8_VERSION} && make USE_PGXS=1 && make USE_PGXS=1 install \
-    && apt-get -y remove git curl \
-    && rm -rf /plv8build  \
-    && rm -rf /var/lib/apt/lists/*
+RUN apt-get -y update && apt-get -y -qq install \
+    postgresql-server-dev-11 gcc make g++ pkg-config libc++-dev curl git
 
+RUN mkdir -p /plv8build
+WORKDIR plv8build
+RUN curl -o plv8.tar.gz -L https://github.com/plv8/plv8/archive/v${PLV8_VERSION}.tar.gz && \
+    tar -xvzf plv8.tar.gz
+RUN cd plv8-${PLV8_VERSION} && make USE_PGXS=1 && make USE_PGXS=1 install
+
+RUN curl -sL https://deb.nodesource.com/setup_11.x | bash - && apt-get install -y nodejs
+
+WORKDIR /var/lib/postgresql
+RUN git clone https://github.com/jerrySievert/plv8-modules
+WORKDIR plv8-modules
+RUN npm install   # as root
+USER postgres
+
+ADD startup.sh /docker-entrypoint-initdb.d
+
+RUN rm -rf /var/lib/apt/lists/*
 RUN apt-get -y autoremove && apt-get clean
