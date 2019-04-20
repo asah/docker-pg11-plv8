@@ -6,24 +6,42 @@ MAINTAINER asah (adam.sah@gmail.com)
 
 ENV PLV8_VERSION=2.3.11
 
-RUN apt-get -y update && apt-get -y -qq install \
-    postgresql-server-dev-11 gcc make g++ pkg-config libc++-dev curl git
+RUN apt-get update -qq && apt-get install -qq --no-install-recommends \
+    postgresql-server-dev-11 gcc make g++ pkg-config libc++-dev curl git python \
+    ca-certificates
 
+#
+# plv8
+#
 RUN mkdir -p /plv8build
 WORKDIR plv8build
-RUN curl -o plv8.tar.gz -L https://github.com/plv8/plv8/archive/v${PLV8_VERSION}.tar.gz && \
-    tar -xvzf plv8.tar.gz
-RUN cd plv8-${PLV8_VERSION} && make USE_PGXS=1 && make USE_PGXS=1 install
+RUN curl -s -o - -L https://github.com/plv8/plv8/archive/v${PLV8_VERSION}.tar.gz | tar -xzf -
+RUN mkdir -p /plv8build/plv8-${PLV8_VERSION}/build
+RUN cd /plv8build/plv8-${PLV8_VERSION} && env GIT_SSL_NO_VERIFY=true make USE_PGXS=1 && make USE_PGXS=1 install
 
-RUN curl -sL https://deb.nodesource.com/setup_11.x | bash - && apt-get install -y nodejs
+#
+# nodejs
+#
+RUN curl -sL https://deb.nodesource.com/setup_11.x | bash - && apt-get install -qq --no-install-recommends nodejs
 
+#
+# plv8-modules
+#
 WORKDIR /var/lib/postgresql
 RUN git clone https://github.com/jerrySievert/plv8-modules
 WORKDIR plv8-modules
 RUN npm install   # as root
-USER postgres
 
-ADD startup.sh /docker-entrypoint-initdb.d
+RUN apt-get purge -qq -y gcc make g++ pkg-config libc++-dev postgresql-server-dev-11 curl git python 
+RUN apt-get -qq -y autoremove && apt-get -qq -y clean
+RUN rm -rf /var/lib/apt/lists/* /plv8build
 
-RUN rm -rf /var/lib/apt/lists/*
-RUN apt-get -y autoremove && apt-get clean
+# startup.sh is optional - you may want other stuff in there
+#ADD startup.sh /docker-entrypoint-initdb.d
+
+# recommended optimization
+
+# recommended startup
+# CMD su - postgres -c "/usr/lib/postgresql/11/bin/initdb -D /var/lib/postgresql/data; /usr/lib/postgresql/11/bin/postgres -D /var/lib/postgresql/data"
+
+

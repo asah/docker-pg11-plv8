@@ -1,7 +1,7 @@
 #!/bin/bash
 
-if [ "x$USER" != "xroot" ]; then
-  echo "$0: must run as root"
+if [ "x$USER" != "xpostgres" ]; then
+  echo "$0: must run as postgres"
 fi
 
 psql -c "create extension plv8"
